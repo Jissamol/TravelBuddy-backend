@@ -1,0 +1,82 @@
+# =========================
+# Django & Python
+# =========================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Django stuff
+*.log
+*.pot
+*.pyc
+*.mo
+*.db
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Migrations (optional: keep if you want to version control them)
+*/migrations/*
+!*/migrations/__init__.py
+
+# =========================
+# Virtual Environment
+# =========================
+venv/
+env/
+ENV/
+.venv/
+.env/
+.env 
+
+# =========================
+# IDE & Editor Settings
+# =========================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# =========================
+# OS / Cache / Build Files
+# =========================
+.DS_Store
+Thumbs.db
+*.bak
+*.swp
+*.tmp
+*.log
+
+# =========================
+# Python environment files
+# =========================
+*.env
+.env.*
+.envrc
+
+# =========================
+# Test / Coverage
+# =========================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+
+# =========================
+# Deployment
+# =========================
+*.pid
+*.seed
+celerybeat-schedule
+*.manifest
