@@ -67,6 +67,9 @@ def haversine(lat1, lon1, lat2, lon2):
 def _get_google_api_key():
     return os.environ.get("GOOGLE_API_KEY", "").strip()
 
+def _get_foursquare_api_key():
+    return os.environ.get("FOURSQUARE_API_KEY", "").strip()
+
 def _get_unsplash_access_key():
     return os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
 
@@ -848,6 +851,8 @@ def route_itineraries(request):
     
     if "error" in result:
         return Response(result, status=500)
+
+    return Response(result)
     
     return Response(result)
 
