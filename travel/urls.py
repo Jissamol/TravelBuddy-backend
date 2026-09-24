@@ -9,6 +9,8 @@ urlpatterns = [
     # path("generate-itinerary/", generate_itinerary, name="generate-itinerary"),
     path('top-itineraries/', top_itineraries, name='top-itineraries'),
     path("nearby-itineraries/", views.nearby_itineraries, name="itineraries-nearby"),
+    path("nearby-places/", views.nearby_places, name="nearby-places"),
+    path("nearby-place-photo/", views.nearby_place_photo, name="nearby-place-photo"),
     path('route-itineraries/', views.route_itineraries, name='route-itineraries'),  
 
     path('save-plan-itineraries/', views.save_plan_itineraries, name='save_plan_itineraries'),
@@ -20,7 +22,5 @@ urlpatterns = [
     path('trips/join/<uuid:token>/', views.join_trip, name='join_trip'),
     path('trips/visibility/<int:plan_id>/', views.update_trip_visibility, name='update_trip_visibility'),
 
-    # Smart Packing Checklist
-    path('packing-checklist/', views.generate_packing_checklist, name='generate_packing_checklist'),
-    path('packing-checklist/<int:plan_id>/', views.update_packing_checklist, name='update_packing_checklist'),
 ]
+

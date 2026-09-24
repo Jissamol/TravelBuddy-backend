@@ -82,23 +82,3 @@ class PlanItinerary(models.Model):
     class Meta:
         ordering = ['travel_plan', 'day_number', 'order_in_day']
         verbose_name_plural = "Plan Itineraries"
-
-
-class PackingChecklist(models.Model):
-    """Stores a smart packing checklist for a travel plan"""
-    travel_plan = models.OneToOneField(
-        TravelPlan,
-        on_delete=models.CASCADE,
-        related_name='packing_checklist'
-    )
-    items = models.JSONField(default=list)  # [{name, category, emoji, reason, checked, is_weather_based}]
-    weather_summary = models.JSONField(default=dict)  # Cached weather forecast summary
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        checked = sum(1 for i in self.items if i.get('checked'))
-        return f"Packing list for {self.travel_plan} ({checked}/{len(self.items)} packed)"
-
-    class Meta:
-        verbose_name_plural = "Packing Checklists"

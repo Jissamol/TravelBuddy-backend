@@ -115,23 +115,4 @@ class UserTravelPlanListSerializer(serializers.ModelSerializer):
     
     def get_duration_days(self, obj):
         """Calculate trip duration in days (defaulting to 3 since dates are removed)"""
-        return 3
-
-
-class PackingChecklistSerializer(serializers.ModelSerializer):
-    """Serializer for PackingChecklist model"""
-    plan_destination = serializers.CharField(source='travel_plan.destination', read_only=True)
-
-    class Meta:
-        from .models import PackingChecklist
-        model = PackingChecklist
-        fields = [
-            'id',
-            'travel_plan',
-            'items',
-            'weather_summary',
-            'plan_destination',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        return 3
