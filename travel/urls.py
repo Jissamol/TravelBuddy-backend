@@ -21,6 +21,9 @@ urlpatterns = [
     path('trips/token/<uuid:token>/', views.get_trip_by_token, name='get_trip_by_token'),
     path('trips/join/<uuid:token>/', views.join_trip, name='join_trip'),
     path('trips/visibility/<int:plan_id>/', views.update_trip_visibility, name='update_trip_visibility'),
-
+    
+    # Image Overrides
+    path('places/override-image/', views.upload_place_image_override, name='upload_place_image_override'),
+    path('itineraries/<int:item_id>/image/', views.update_plan_itinerary_image, name='update_plan_itinerary_image'),
 ]
 

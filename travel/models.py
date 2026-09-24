@@ -13,6 +13,7 @@ class TravelPlan(models.Model):
     )
     start_location = models.CharField(max_length=255)
     destination = models.CharField(max_length=255)
+    cover_image = models.ImageField(upload_to='trip_covers/', null=True, blank=True)
 
     
     # Social Features
@@ -40,6 +41,7 @@ class Itinerary(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     image_url = models.URLField(max_length=500, blank=True)
+    custom_image = models.ImageField(upload_to='itinerary_images/', null=True, blank=True)
     city = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -65,6 +67,7 @@ class PlanItinerary(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     image_url = models.URLField(max_length=500, blank=True)
+    custom_image = models.ImageField(upload_to='itinerary_images/', null=True, blank=True)
     city = models.CharField(max_length=100, blank=True)
     location = models.CharField(max_length=255, blank=True)
     distance = models.FloatField(default=0)  # Distance from start
@@ -82,3 +85,13 @@ class PlanItinerary(models.Model):
     class Meta:
         ordering = ['travel_plan', 'day_number', 'order_in_day']
         verbose_name_plural = "Plan Itineraries"
+
+
+class PlaceImageOverride(models.Model):
+    """Stores global user-uploaded image overrides for Google Places/OSM places."""
+    place_id = models.CharField(max_length=255, unique=True, db_index=True)
+    image = models.ImageField(upload_to='place_overrides/')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Override for {self.place_id}"

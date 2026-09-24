@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import TravelPlan, Itinerary, PlanItinerary
+from .models import TravelPlan, Itinerary, PlanItinerary, PlaceImageOverride
 from .serializers import TravelPlanSerializer, ItinerarySerializer, PlanItinerarySerializer
 import asyncio
 import aiohttp
@@ -537,6 +537,12 @@ def nearby_itineraries(request):
                 district = tags.get("addr:district") or tags.get("addr:suburb") or ""
                 description = res.get("description") or f"A notable {tags.get('tourism', 'attraction').replace('_',' ')} near {city}."
 
+                override = await asyncio.to_thread(lambda: PlaceImageOverride.objects.filter(place_id=str(el.get("id"))).first())
+                if override and override.image:
+                    image_url = request.build_absolute_uri(override.image.url)
+                else:
+                    image_url = res.get("image")
+
                 final_results.append({
                     "id": el.get("id"),
                     "name": name,
@@ -546,7 +552,7 @@ def nearby_itineraries(request):
                     "city": city,
                     "district": district,
                     "location": res.get("location"),
-                    "image": res.get("image"),
+                    "image": image_url,
                     "distance": dist,
                 })
 
@@ -632,12 +638,16 @@ def nearby_places(request):
         photos = place.get("photos") or []
         photo_name = photos[0].get("name") if photos else None
         image_url = None
-        if photo_name:
-            image_url = _photo_proxy_url(request, photo_name, place_id)
+        override = PlaceImageOverride.objects.filter(place_id=place_id).first()
+        if override and override.image:
+            image_url = request.build_absolute_uri(override.image.url)
         else:
-            image_url = _fetch_fallback_image(display_name or "", formatted_address, category)
-            if not image_url:
-                image_url = _photo_proxy_url(request, None, place_id)
+            if photo_name:
+                image_url = _photo_proxy_url(request, photo_name, place_id)
+            else:
+                image_url = _fetch_fallback_image(display_name or "", formatted_address, category)
+                if not image_url:
+                    image_url = _photo_proxy_url(request, None, place_id)
         if settings.DEBUG:
             print(
                 f"[Places] {display_name or place_id} | photo={photo_name or 'none'} | url={image_url}"
@@ -792,12 +802,16 @@ def route_itineraries(request):
         photos = place.get("photos") or []
         photo_name = photos[0].get("name") if photos else None
         
-        if photo_name:
-            image_url = _photo_proxy_url(request, photo_name, place_id)
+        override = PlaceImageOverride.objects.filter(place_id=place_id).first()
+        if override and override.image:
+            image_url = request.build_absolute_uri(override.image.url)
         else:
-            image_url = _fetch_fallback_image(name, formatted_address, "tourist")
-            if not image_url:
-                image_url = _photo_proxy_url(request, None, place_id)
+            if photo_name:
+                image_url = _photo_proxy_url(request, photo_name, place_id)
+            else:
+                image_url = _fetch_fallback_image(name, formatted_address, "tourist")
+                if not image_url:
+                    image_url = _photo_proxy_url(request, None, place_id)
 
         loc = place.get("location", {})
         
@@ -1037,3 +1051,49 @@ class TravelPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TravelPlanSerializer
     queryset = TravelPlan.objects.all()
     permission_classes = [AllowAny] # Ideally we'd want IsAuthenticated or custom permission but since token sharing exists, let's keep it simple.
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def upload_place_image_override(request):
+    """
+    Upload a global custom image for a specific place (Google Place ID or OSM ID).
+    Expects multipart/form-data with 'place_id' and 'image' file.
+    """
+    place_id = request.data.get('place_id')
+    image_file = request.FILES.get('image')
+
+    if not place_id or not image_file:
+        return Response({"error": "place_id and image file are required."}, status=400)
+
+    try:
+        # Update or create override for this place
+        override, created = PlaceImageOverride.objects.update_or_create(
+            place_id=place_id,
+            defaults={'image': image_file}
+        )
+        image_url = request.build_absolute_uri(override.image.url)
+        return Response({"message": "Image uploaded successfully", "image_url": image_url}, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def update_plan_itinerary_image(request, item_id):
+    """
+    Upload a custom image for a specific PlanItinerary (item in a trip).
+    """
+    image_file = request.FILES.get('custom_image')
+    if not image_file:
+        return Response({"error": "custom_image file is required."}, status=400)
+    
+    try:
+        item = PlanItinerary.objects.get(id=item_id)
+        item.custom_image = image_file
+        item.save()
+        image_url = request.build_absolute_uri(item.custom_image.url)
+        return Response({"message": "Image updated successfully", "image_url": image_url}, status=200)
+    except PlanItinerary.DoesNotExist:
+        return Response({"error": "Item not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

@@ -15,7 +15,7 @@ class PlanItinerarySerializer(serializers.ModelSerializer):
         # Ensure lat/lon mapping for frontend compatibility
         representation['lat'] = representation.get('latitude')
         representation['lon'] = representation.get('longitude')
-        representation['image'] = representation.get('image_url')
+        representation['image'] = representation.get('custom_image') or representation.get('image_url')
         return representation
 
 class TripMemberSerializer(serializers.ModelSerializer):
@@ -30,7 +30,7 @@ class TravelPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = TravelPlan
         fields = [
-            'id', 'user', 'start_location', 'destination',
+            'id', 'user', 'start_location', 'destination', 'cover_image',
             'created_at', 'updated_at', 'share_token', 'is_public', 
             'collaborators', 'collaborators_details', 'is_owner'
         ]
@@ -55,6 +55,7 @@ class ItinerarySerializer(serializers.ModelSerializer):
             'latitude',
             'longitude',
             'image_url',
+            'custom_image',
             'city',
             'distance',
             'created_at'
@@ -69,9 +70,10 @@ class ItinerarySerializer(serializers.ModelSerializer):
         if hasattr(instance, 'distance'):
             representation['distance'] = round(instance.distance, 2)
         
-        # Ensure image_url is returned as 'image' for frontend compatibility
-        if 'image_url' in representation:
-            representation['image'] = representation.pop('image_url')
+        # Ensure custom_image overrides image_url, then return as 'image' for frontend compatibility
+        custom_img = representation.pop('custom_image', None)
+        img_url = representation.pop('image_url', None)
+        representation['image'] = custom_img or img_url
         
         # Map latitude/longitude to lat/lon for frontend
         representation['lat'] = representation.pop('latitude')
@@ -105,6 +107,7 @@ class UserTravelPlanListSerializer(serializers.ModelSerializer):
             'id',
             'start_location',
             'destination',
+            'cover_image',
             'duration_days',
             'is_public',
             'share_token',
