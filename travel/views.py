@@ -670,7 +670,7 @@ def nearby_place_photo(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def route_itineraries(request):
-    """Fetch tourist attractions along a route between start and destination."""
+    """Fetch tourist attractions along a route using Google Places API."""
     try:
         start_lat = float(request.GET.get("start_lat"))
         start_lon = float(request.GET.get("start_lon"))
@@ -679,180 +679,120 @@ def route_itineraries(request):
     except (TypeError, ValueError):
         return Response({"error": "Invalid coordinates"}, status=400)
 
+    api_key = _get_google_api_key()
+    if not api_key:
+        return Response({"error": "Google API key is missing"}, status=500)
+
     def point_to_line_distance(px, py, x1, y1, x2, y2):
-        """Calculate perpendicular distance from point (px,py) to line segment (x1,y1)-(x2,y2)"""
-        # Calculate distances (haversine expects degrees, converts internally)
         dist_start = haversine(x1, y1, px, py)
         dist_end = haversine(x2, y2, px, py)
         dist_line = haversine(x1, y1, x2, y2)
-        
         if dist_line == 0:
             return dist_start
-        
-        # Use semi-perimeter formula (Heron's formula variant)
         s = (dist_start + dist_end + dist_line) / 2
         area_squared = s * (s - dist_start) * (s - dist_end) * (s - dist_line)
-        
         if area_squared <= 0:
             return min(dist_start, dist_end)
-        
-        # Perpendicular distance = 2 * Area / Base
-        perp_distance = (2 * sqrt(area_squared)) / dist_line
-        return perp_distance
+        return (2 * sqrt(area_squared)) / dist_line
 
-    async def async_logic():
-        # Calculate route distance and search parameters
-        route_distance = haversine(start_lat, start_lon, dest_lat, dest_lon)
-        
-        # Calculate midpoint for search
-        mid_lat = (start_lat + dest_lat) / 2
-        mid_lon = (start_lon + dest_lon) / 2
-        
-        # Maximum deviation from route line (in km) - much more lenient
-        max_deviation = max(25, min(60, route_distance * 0.6)) 
-
-        # Search radius: tightly bound around the route and deviation to prevent Overpass timeouts
-        search_radius = (route_distance / 2 + max_deviation + 10) * 1000
-        search_radius = min(100000, max(20000, search_radius))
-
-        query = f"""
-        [out:json][timeout:30];
-        (
-          nwr["tourism"~"attraction|museum|viewpoint|zoo|theme_park|artwork|gallery|information"](around:{int(search_radius)},{mid_lat},{mid_lon});
-          nwr["historic"~"monument|castle|ruins|memorial|archaeological_site|heritage"](around:{int(search_radius)},{mid_lat},{mid_lon});
-          nwr["natural"~"peak|waterfall|beach|cave|rock|wood"](around:{int(search_radius)},{mid_lat},{mid_lon});
-          nwr["amenity"~"place_of_worship|park|library|theatre"](around:{int(search_radius)},{mid_lat},{mid_lon});
-          nwr["leisure"~"park|garden|nature_reserve|water_park"](around:{int(search_radius)},{mid_lat},{mid_lon});
-        );
-        out center;
-        """
-
-        async with aiohttp.ClientSession() as session:
-            try:
-                headers = {"User-Agent": "TravelBuddyApp/1.0 (contact: admin@travelbuddy.com)"}
-                async with session.post(
-                    "https://overpass-api.de/api/interpreter", data=query, headers=headers, timeout=35
-                ) as resp:
-                    if resp.status != 200:
-                        return {"error": f"Failed to fetch places, status={resp.status}"}
-                    data = await resp.json()
-            except Exception as e:
-                return {"error": f"Failed to fetch places: {str(e)}"}
-
-            elements = data.get("elements", [])
-            if not elements:
-                return {"itineraries": []}
-
-            semaphore = asyncio.Semaphore(1)
-            
-            # Filter places along the route first
-            filtered_elements = []
-            for el in elements:
-                tags = el.get("tags", {})
-                place_lat = el.get("lat") or (el.get("center", {}).get("lat") if el.get("center") else None)
-                place_lon = el.get("lon") or (el.get("center", {}).get("lon") if el.get("center") else None)
-                
-                if not place_lat or not place_lon:
-                    continue
-                
-                # Store them back for later use
-                el['lat'] = place_lat
-                el['lon'] = place_lon
-
-                # Get name
-                name = (
-                    tags.get("name")
-                    or tags.get("alt_name")
-                    or tags.get("official_name")
-                )
-
-                # Skip unnamed or generic places
-                if not name or name.lower() in ["viewpoint", "attraction", "monument", "museum", "scenic spot"]:
-                    continue
-
-                # Calculate perpendicular distance from route line
-                perp_dist = point_to_line_distance(
-                    place_lat, place_lon,
-                    start_lat, start_lon,
-                    dest_lat, dest_lon
-                )
-                
-                # Only include if close to the route
-                if perp_dist <= max_deviation:
-                    # Calculate distance from start
-                    dist_from_start = haversine(start_lat, start_lon, place_lat, place_lon)
-                    dist_from_end = haversine(dest_lat, dest_lon, place_lat, place_lon)
-                    
-                    # Place should be within the route bounds (with more tolerance)
-                    if dist_from_start <= route_distance + 40 and dist_from_end <= route_distance + 40:
-                        el['distance_from_start'] = dist_from_start
-                        el['perp_distance'] = perp_dist
-                        filtered_elements.append(el)
-
-            # Sort by distance from start
-            filtered_elements.sort(key=lambda x: x['distance_from_start'])
-            
-            # Limit to reasonable number of places to keep reverse geocoding fast
-            filtered_elements = filtered_elements[:30]
-
-            if not filtered_elements:
-                return {"itineraries": []}
-
-            # Fetch detailed info for filtered places
-            tasks = []
-            for el in filtered_elements:
-                tags = el.get("tags", {})
-                name = tags.get("name") or tags.get("alt_name") or "Tourist Spot"
-                
-                tasks.append(fetch_place_info(
-                    session,
-                    name,
-                    el["lat"],
-                    el["lon"],
-                    tags,
-                    semaphore
-                ))
-
-            results = await asyncio.gather(*tasks)
-
-            # Build final results
-            final_results = []
-            for el, res in zip(filtered_elements, results):
-                if not res:
-                    continue
-                    
-                tags = el.get("tags", {})
-                name = tags.get("name") or "Tourist Spot"
-                
-                city = tags.get("addr:city") or tags.get("addr:town") or tags.get("addr:village") or "Unknown"
-                district = tags.get("addr:district") or tags.get("addr:suburb") or ""
-                
-                category = tags.get("tourism") or tags.get("historic") or tags.get("natural") or "attraction"
-                description = res.get("description") or f"A notable {category.replace('_', ' ')} worth visiting on your journey."
-
-                final_results.append({
-                    "id": el.get("id"),
-                    "name": name,
-                    "description": description,
-                    "lat": el["lat"],
-                    "lon": el["lon"],
-                    "city": city,
-                    "district": district,
-                    "location": res.get("location"),
-                    "image": res.get("image"),
-                    "distance": round(el['distance_from_start'], 2),
-                    "category": category,
-                    "deviation": round(el['perp_distance'], 2)
-                })
-
-            return {"itineraries": final_results}
-
-    result = asyncio.run(async_logic())
+    route_distance = haversine(start_lat, start_lon, dest_lat, dest_lon)
+    mid_lat = (start_lat + dest_lat) / 2
+    mid_lon = (start_lon + dest_lon) / 2
     
-    if "error" in result:
-        return Response(result, status=500)
+    max_deviation = max(25, min(60, route_distance * 0.6)) 
+    search_radius = (route_distance / 2 + max_deviation + 10) * 1000
+    search_radius = min(50000, max(20000, search_radius)) # Google max 50km
 
-    return Response(result)
+    url = "https://places.googleapis.com/v1/places:searchNearby"
+    payload = {
+        "includedTypes": ["tourist_attraction", "historical_landmark", "national_park"],
+        "maxResultCount": 20,
+        "locationRestriction": {
+            "circle": {
+                "center": {"latitude": mid_lat, "longitude": mid_lon},
+                "radius": float(search_radius),
+            }
+        }
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        "X-Goog-FieldMask": (
+            "places.id,places.displayName,places.formattedAddress,places.location,"
+            "places.rating,places.userRatingCount,places.photos.name"
+        ),
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=12)
+        if response.status_code != 200:
+            return Response({"error": "Failed to fetch route places from Google"}, status=502)
+        data = response.json()
+    except requests.RequestException:
+        return Response({"error": "Failed to fetch route places from Google"}, status=502)
+
+    places = data.get("places", [])
+    filtered_elements = []
+
+    for place in places:
+        loc = place.get("location", {})
+        place_lat = loc.get("latitude")
+        place_lon = loc.get("longitude")
+        
+        if not place_lat or not place_lon:
+            continue
+
+        perp_dist = point_to_line_distance(place_lat, place_lon, start_lat, start_lon, dest_lat, dest_lon)
+        if perp_dist <= max_deviation:
+            dist_from_start = haversine(start_lat, start_lon, place_lat, place_lon)
+            dist_from_end = haversine(dest_lat, dest_lon, place_lat, place_lon)
+            
+            if dist_from_start <= route_distance + 40 and dist_from_end <= route_distance + 40:
+                place['distance_from_start'] = dist_from_start
+                place['perp_distance'] = perp_dist
+                filtered_elements.append(place)
+
+    filtered_elements.sort(key=lambda x: x['distance_from_start'])
+
+    final_results = []
+    seen_ids = set()
+    for place in filtered_elements:
+        place_id = place.get("id")
+        if place_id in seen_ids:
+            continue
+        seen_ids.add(place_id)
+
+        name = (place.get("displayName") or {}).get("text", "Tourist Spot")
+        formatted_address = place.get("formattedAddress", "")
+        
+        photos = place.get("photos") or []
+        photo_name = photos[0].get("name") if photos else None
+        
+        if photo_name:
+            image_url = _photo_proxy_url(request, photo_name, place_id)
+        else:
+            image_url = _fetch_fallback_image(name, formatted_address, "tourist")
+            if not image_url:
+                image_url = _photo_proxy_url(request, None, place_id)
+
+        loc = place.get("location", {})
+        
+        final_results.append({
+            "id": place_id,
+            "name": name,
+            "description": f"{name} is a notable place on your route at {formatted_address}.",
+            "lat": loc.get("latitude"),
+            "lon": loc.get("longitude"),
+            "city": "",
+            "district": "",
+            "location": formatted_address,
+            "image": image_url,
+            "distance": round(place['distance_from_start'], 2),
+            "category": "attraction",
+            "deviation": round(place['perp_distance'], 2)
+        })
+
+    return Response({"itineraries": final_results})
     
     return Response(result)
 
