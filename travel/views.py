@@ -960,7 +960,7 @@ def all_itineraries_daywise(request):
                 places_data = [{
                     'id': p.id, 'name': p.name, 'description': p.description,
                     'location': p.location or p.city or 'Unknown',
-                    'image': p.image_url or f"https://picsum.photos/seed/{p.name}/400/300",
+                    'image': request.build_absolute_uri(p.custom_image.url) if p.custom_image else (p.image_url or f"https://picsum.photos/seed/{p.name}/400/300"),
                     'lat': float(p.latitude), 'lon': float(p.longitude),
                     'distance': p.distance, 'category': p.category
                 } for p in places]
