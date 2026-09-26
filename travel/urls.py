@@ -25,5 +25,7 @@ urlpatterns = [
     # Image Overrides
     path('places/override-image/', views.upload_place_image_override, name='upload_place_image_override'),
     path('itineraries/<int:item_id>/image/', views.update_plan_itinerary_image, name='update_plan_itinerary_image'),
+    path('plans/<int:plan_id>/accommodations/', views.AccommodationListCreateView.as_view(), name='accommodation_list_create'),
+    path('accommodations/<int:pk>/', views.AccommodationDetailView.as_view(), name='accommodation_detail'),
 ]
 
