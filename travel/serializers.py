@@ -1,8 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import TravelPlan, Itinerary, PlanItinerary
+from .models import TravelPlan, Itinerary, PlanItinerary, Accommodation
 
 User = get_user_model()
+
+class AccommodationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Accommodation
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at']
 
 class PlanItinerarySerializer(serializers.ModelSerializer):
     class Meta:

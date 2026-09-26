@@ -1,4 +1,4 @@
-from django.conf import settings
+﻿from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
 from django.core.cache import cache
@@ -1097,3 +1097,25 @@ def update_plan_itinerary_image(request, item_id):
         return Response({"error": "Item not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+from .models import Accommodation
+from .serializers import AccommodationSerializer
+
+class AccommodationListCreateView(generics.ListCreateAPIView):
+    serializer_class = AccommodationSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        plan_id = self.kwargs.get("plan_id")
+        return Accommodation.objects.filter(travel_plan_id=plan_id)
+        
+    def perform_create(self, serializer):
+        plan_id = self.kwargs.get("plan_id")
+        serializer.save(travel_plan_id=plan_id)
+
+class AccommodationDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = AccommodationSerializer
+    permission_classes = [AllowAny]
+    queryset = Accommodation.objects.all()
+
+
+
