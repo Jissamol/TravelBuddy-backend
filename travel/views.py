@@ -1,4 +1,4 @@
-﻿from django.conf import settings
+from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
 from django.core.cache import cache
@@ -1117,5 +1117,52 @@ class AccommodationDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [AllowAny]
     queryset = Accommodation.objects.all()
 
+from .models import MemoryFolder, MemoryImage
+from .serializers import MemoryFolderSerializer, MemoryImageSerializer
 
+class MemoryFolderListCreateView(generics.ListCreateAPIView):
+    serializer_class = MemoryFolderSerializer
+    permission_classes = [AllowAny]
 
+    def get_queryset(self):
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryFolder.objects.filter(user=user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(user=user)
+
+class MemoryFolderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = MemoryFolderSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryFolder.objects.filter(user=user)
+
+class MemoryImageListCreateView(generics.ListCreateAPIView):
+    serializer_class = MemoryImageSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        folder_id = self.kwargs.get("folder_id")
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryImage.objects.filter(folder_id=folder_id, folder__user=user).order_by('-uploaded_at')
+
+    def perform_create(self, serializer):
+        folder_id = self.kwargs.get("folder_id")
+        # Ensure the folder belongs to the user
+        try:
+            user = self.request.user if self.request.user.is_authenticated else None
+            folder = MemoryFolder.objects.get(id=folder_id, user=user)
+            serializer.save(folder=folder)
+        except MemoryFolder.DoesNotExist:
+            pass
+
+class MemoryImageDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = MemoryImageSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryImage.objects.filter(folder__user=user)

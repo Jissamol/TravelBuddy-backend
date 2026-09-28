@@ -27,5 +27,11 @@ urlpatterns = [
     path('itineraries/<int:item_id>/image/', views.update_plan_itinerary_image, name='update_plan_itinerary_image'),
     path('plans/<int:plan_id>/accommodations/', views.AccommodationListCreateView.as_view(), name='accommodation_list_create'),
     path('accommodations/<int:pk>/', views.AccommodationDetailView.as_view(), name='accommodation_detail'),
+    
+    # Memories
+    path('memories/folders/', views.MemoryFolderListCreateView.as_view(), name='memory_folder_list_create'),
+    path('memories/folders/<int:pk>/', views.MemoryFolderDetailView.as_view(), name='memory_folder_detail'),
+    path('memories/folders/<int:folder_id>/images/', views.MemoryImageListCreateView.as_view(), name='memory_image_list_create'),
+    path('memories/images/<int:pk>/', views.MemoryImageDetailView.as_view(), name='memory_image_detail'),
 ]
 
