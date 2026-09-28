@@ -136,4 +136,30 @@ class Accommodation(models.Model):
                 start_time=self.check_in.time(),
                 end_time=self.check_out.time(),
                 activity_type='accommodation'
-            )
+            )
+
+class MemoryFolder(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="memory_folders"
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+        
+class MemoryImage(models.Model):
+    folder = models.ForeignKey(
+        MemoryFolder,
+        on_delete=models.CASCADE,
+        related_name="images"
+    )
+    image = models.ImageField(upload_to='memories/')
+    caption = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image in {self.folder.name}"

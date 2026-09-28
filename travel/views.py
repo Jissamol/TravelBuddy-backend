@@ -1,4 +1,4 @@
-﻿from django.conf import settings
+from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
 from django.core.cache import cache
@@ -1117,5 +1117,46 @@ class AccommodationDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [AllowAny]
     queryset = Accommodation.objects.all()
 
+from .models import MemoryFolder, MemoryImage
+from .serializers import MemoryFolderSerializer, MemoryImageSerializer
 
+class MemoryFolderListCreateView(generics.ListCreateAPIView):
+    serializer_class = MemoryFolderSerializer
+    permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return MemoryFolder.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class MemoryFolderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = MemoryFolderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return MemoryFolder.objects.filter(user=self.request.user)
+
+class MemoryImageListCreateView(generics.ListCreateAPIView):
+    serializer_class = MemoryImageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        folder_id = self.kwargs.get("folder_id")
+        return MemoryImage.objects.filter(folder_id=folder_id, folder__user=self.request.user).order_by('-uploaded_at')
+
+    def perform_create(self, serializer):
+        folder_id = self.kwargs.get("folder_id")
+        # Ensure the folder belongs to the user
+        try:
+            folder = MemoryFolder.objects.get(id=folder_id, user=self.request.user)
+            serializer.save(folder=folder)
+        except MemoryFolder.DoesNotExist:
+            pass
+
+class MemoryImageDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = MemoryImageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return MemoryImage.objects.filter(folder__user=self.request.user)
