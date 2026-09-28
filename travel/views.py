@@ -1122,41 +1122,47 @@ from .serializers import MemoryFolderSerializer, MemoryImageSerializer
 
 class MemoryFolderListCreateView(generics.ListCreateAPIView):
     serializer_class = MemoryFolderSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        return MemoryFolder.objects.filter(user=self.request.user).order_by('-created_at')
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryFolder.objects.filter(user=user).order_by('-created_at')
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(user=user)
 
 class MemoryFolderDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = MemoryFolderSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        return MemoryFolder.objects.filter(user=self.request.user)
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryFolder.objects.filter(user=user)
 
 class MemoryImageListCreateView(generics.ListCreateAPIView):
     serializer_class = MemoryImageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         folder_id = self.kwargs.get("folder_id")
-        return MemoryImage.objects.filter(folder_id=folder_id, folder__user=self.request.user).order_by('-uploaded_at')
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryImage.objects.filter(folder_id=folder_id, folder__user=user).order_by('-uploaded_at')
 
     def perform_create(self, serializer):
         folder_id = self.kwargs.get("folder_id")
         # Ensure the folder belongs to the user
         try:
-            folder = MemoryFolder.objects.get(id=folder_id, user=self.request.user)
+            user = self.request.user if self.request.user.is_authenticated else None
+            folder = MemoryFolder.objects.get(id=folder_id, user=user)
             serializer.save(folder=folder)
         except MemoryFolder.DoesNotExist:
             pass
 
 class MemoryImageDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = MemoryImageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        return MemoryImage.objects.filter(folder__user=self.request.user)
+        user = self.request.user if self.request.user.is_authenticated else None
+        return MemoryImage.objects.filter(folder__user=user)

@@ -8,7 +8,7 @@ class MemoryImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = MemoryImage
         fields = '__all__'
-        read_only_fields = ['id', 'uploaded_at']
+        read_only_fields = ['id', 'uploaded_at', 'folder']
 
 class MemoryFolderSerializer(serializers.ModelSerializer):
     preview_image = serializers.SerializerMethodField()

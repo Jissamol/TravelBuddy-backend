@@ -142,7 +142,9 @@ class MemoryFolder(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="memory_folders"
+        related_name="memory_folders",
+        null=True,
+        blank=True
     )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
