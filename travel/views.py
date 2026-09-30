@@ -114,20 +114,11 @@ def _google_places_params(lat, lon, category, radius):
 
 
 
-def _fetch_unsplash_photo(name, address=None):
-    access_key = _get_unsplash_access_key()
-    if not access_key or not name:
-        if settings.DEBUG:
-            if not access_key:
-                print("[Unsplash] missing access key")
-            if not name:
-                print("[Unsplash] missing place name")
-        return None
-
-    # Search Unsplash by place name only (ignoring address to avoid over-specification)
-    query = name
+def _do_unsplash_request(query, access_key):
     cache_key = _hashed_cache_key("unsplash_photo", query)
     cached = cache.get(cache_key)
+    if cached == "NOT_FOUND":
+        return None
     if cached is not None:
         if settings.DEBUG:
             print(f"[Unsplash] cache hit for {query}")
@@ -152,30 +143,63 @@ def _fetch_unsplash_photo(name, address=None):
                 print(
                     f"[Unsplash] {query} status={response.status_code} body={response.text[:300]}"
                 )
-            cache.set(cache_key, None, UNSPLASH_CACHE_TTL)
+            cache.set(cache_key, "NOT_FOUND", UNSPLASH_CACHE_TTL)
             return None
         try:
             payload = response.json() or {}
         except ValueError:
             if settings.DEBUG:
                 print(f"[Unsplash] {query} invalid JSON response")
-            cache.set(cache_key, None, UNSPLASH_CACHE_TTL)
+            cache.set(cache_key, "NOT_FOUND", UNSPLASH_CACHE_TTL)
             return None
 
         results = payload.get("results", [])
         if not results:
             if settings.DEBUG:
                 print(f"[Unsplash] no results for {query}")
-            cache.set(cache_key, None, UNSPLASH_CACHE_TTL)
+            cache.set(cache_key, "NOT_FOUND", UNSPLASH_CACHE_TTL)
             return None
 
         image_url = results[0].get("urls", {}).get("regular")
         if not image_url and settings.DEBUG:
             print(f"[Unsplash] missing image URL for {query}")
-        cache.set(cache_key, image_url, UNSPLASH_CACHE_TTL)
+        cache.set(cache_key, image_url or "NOT_FOUND", UNSPLASH_CACHE_TTL)
         return image_url
     except requests.RequestException:
         return None
+
+def _fetch_unsplash_photo(name, address=None):
+    access_key = _get_unsplash_access_key()
+    if not access_key or not name:
+        if settings.DEBUG:
+            if not access_key:
+                print("[Unsplash] missing access key")
+            if not name:
+                print("[Unsplash] missing place name")
+        return None
+
+    # Search Unsplash by place name
+    img = _do_unsplash_request(name, access_key)
+    if img:
+        return img
+        
+    # Fallback: if name has a hyphen, it might be too specific (e.g. "View Point - Kolli Hills")
+    if " - " in name:
+        # Try right side (usually the broader location)
+        fallback_right = name.split(" - ")[-1].strip()
+        if fallback_right:
+            img = _do_unsplash_request(fallback_right, access_key)
+            if img:
+                return img
+        
+        # Try left side
+        fallback_left = name.split(" - ")[0].strip()
+        if fallback_left:
+            img = _do_unsplash_request(fallback_left, access_key)
+            if img:
+                return img
+                
+    return None
 
 def _fetch_wikipedia_image(name):
     if not name:
